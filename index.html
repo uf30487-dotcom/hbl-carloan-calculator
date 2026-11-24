@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HBL CarLoan Amortization Calculator</title>
+    <style>
+        :root {
+            --primary: #006b3f;
+            --primary-dark: #004e2d;
+            --bg: #f3f6f4;
+            --card: #ffffff;
+            --text: #111827;
+            --muted: #6b7280;
+            --border: #e5e7eb;
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
+        .container { max-width: 1120px; margin: 0 auto; }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #fff;
+            padding: 20px 24px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .header h1 { margin: 0 0 6px; font-size: 24px; }
+        .header p { margin: 0; font-size: 13.5px; opacity: 0.92; }
+
+        .grid { display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
+        @media (max-width: 840px) { .grid { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .field { margin-bottom: 14px; }
+        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+        input {
+            width: 100%; padding: 9px 12px; border: 1px solid #d1d5db;
+            border-radius: 8px; font-size: 14px;
+        }
+        input[readonly] { background: #f9fafb; color: #374151; }
+
+        .btn-group { display: flex; gap: 10px; margin-top: 8px; }
+        button {
+            flex: 1; padding: 11px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+        .btn-calc { background: var(--primary); color: #fff; }
+        .btn-calc:hover { background: var(--primary-dark); }
+        .btn-csv { background: #e5e7eb; color: #111827; }
+        .btn-csv:hover { background: #d1d5db; }
+
+        .error { color: #b91c1c; font-size: 12.5px; margin-top: 8px; min-height: 18px; }
+
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+        @media (max-width: 600px) { .stats { grid-template-columns: 1fr; } }
+        .stat {
+            background: #f9fafb; border: 1px solid var(--border);
+            border-radius: 10px; padding: 12px;
+        }
+        .stat span { display: block; font-size: 12px; color: var(--muted); }
+        .stat strong { display: block; margin-top: 4px; font-size: 17px; color: var(--primary); }
+
+        .table-wrap { max-height: 390px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: right; }
+        th { position: sticky; top: 0; background: #f3f4f6; padding: 10px; border-bottom: 1px solid var(--border); }
+        td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+        th:first-child, td:first-child { text-align: center; }
+        tr:hover { background: #f9fafb; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>HBL CarLoan — Amortization Calculator</h1>
+        <p>Bank: HBL | Account Type: HBL Current / Savings Account | Loan Product: HBL CarLoan</p>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="field">
+                <label>Bank</label>
+                <input type="text" id="bank" value="HBL (Habib Bank Limited)" readonly>
+            </div>
+            <div class="field">
+                <label>Account Type</label>
+                <input type="text" id="accountType" value="HBL Current / Savings Account" readonly>
+            </div>
+            <div class="field">
+                <label>Loan Product</label>
+                <input type="text" id="product" value="HBL CarLoan" readonly>
+            </div>
+            <div class="field">
+                <label>Financed Loan Amount (PKR)</label>
+                <input type="number" id="principal" value="2450000" min="10000" step="10000">
+            </div>
+            <div class="field">
+                <label>Annual Markup Rate (%)</label>
+                <input type="number" id="annualRate" value="13.99" min="0.1" max="100" step="0.01">
+            </div>
+            <div class="field">
+                <label>Tenure (Years)</label>
+                <input type="number" id="years" value="3" min="1" max="10">
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-calc" onclick="calculate()">Calculate</button>
+                <button class="btn-csv" onclick="downloadCSV()">Export CSV</button>
+            </div>
+            <div class="error" id="errorMsg"></div>
+        </div>
+
+        <div class="card">
+            <div class="stats">
+                <div class="stat">
+                    <span>Monthly Installment (EMI)</span>
+                    <strong id="emiVal">PKR 0</strong>
+                </div>
+                <div class="stat">
+                    <span>Total Markup</span>
+                    <strong id="markupVal" style="color: #b45309;">PKR 0</strong>
+                </div>
+                <div class="stat">
+                    <span>Total Payable</span>
+                    <strong id="totalVal">PKR 0</strong>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>EMI</th>
+                            <th>Principal</th>
+                            <th>Markup</th>
+                            <th>Remaining Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let scheduleData = [];
+
+    function fmt(n) {
+        return "PKR " + Math.round(n).toLocaleString("en-PK");
+    }
+
+    function calculate() {
+        const P = parseFloat(document.getElementById("principal").value);
+        const rate = parseFloat(document.getElementById("annualRate").value);
+        const yrs = parseInt(document.getElementById("years").value, 10);
+        const err = document.getElementById("errorMsg");
+
+        if (isNaN(P) || isNaN(rate) || isNaN(yrs) || P <= 0 || rate <= 0 || yrs <= 0) {
+            err.innerText = "Please enter valid positive numbers for amount, rate, and years.";
+            return;
+        }
+        err.innerText = "";
+
+        const r = (rate / 100) / 12;
+        const n = yrs * 12;
+        const emi = (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+        const totalPayable = emi * n;
+        const totalMarkup = totalPayable - P;
+
+        document.getElementById("emiVal").innerText = fmt(emi);
+        document.getElementById("markupVal").innerText = fmt(totalMarkup);
+        document.getElementById("totalVal").innerText = fmt(totalPayable);
+
+        let balance = P;
+        let rows = "";
+        scheduleData = [];
+
+        for (let m = 1; m <= n; m++) {
+            const markup = balance * r;
+            const principalPaid = emi - markup;
+            balance = Math.max(0, balance - principalPaid);
+
+            scheduleData.push({
+                month: m,
+                emi: Math.round(emi),
+                principal: Math.round(principalPaid),
+                markup: Math.round(markup),
+                balance: Math.round(balance)
+            });
+
+            rows += `
+                <tr>
+                    <td>${m}</td>
+                    <td>${fmt(emi)}</td>
+                    <td>${fmt(principalPaid)}</td>
+                    <td>${fmt(markup)}</td>
+                    <td>${fmt(balance)}</td>
+                </tr>
+            `;
+        }
+
+        document.getElementById("tableBody").innerHTML = rows;
+    }
+
+    function downloadCSV() {
+        if (!scheduleData.length) return;
+        const headers = ["Month", "EMI (PKR)", "Principal (PKR)", "Markup (PKR)", "Remaining Balance (PKR)"];
+        const lines = [headers.join(",")];
+
+        scheduleData.forEach(row => {
+            lines.push([row.month, row.emi, row.principal, row.markup, row.balance].join(","));
+        });
+
+        const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "HBL_CarLoan_Amortization_Schedule.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    window.onload = calculate;
+</script>
+</body>
+</html>
